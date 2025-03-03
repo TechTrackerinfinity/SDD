@@ -5,16 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Shree Dangigev Diamonds</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* Full-screen, minimalistic style */
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      height: 100%;
+      overflow: hidden;
+    }
+    .video-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    video {
+      width: 100%;
+      height: auto;
+      max-height: 100%;
+    }
+  </style>
 </head>
 <body>
-  <main class="container">
-    <h1>OVAL 5.54 VIVID PINK</h1>
-    <div class="video-wrapper">
-      <video id="myVideo" controls autoplay muted playsinline loop>
-        <source src="assets/videos/POV554.mp4" type="video/mp4">
-        Your browser does not support the video tag.
-      </video>
-    </div>
-  </main>
+  <div class="video-container">
+    <video controls autoplay muted playsinline loop>
+      <source src="assets/videos/POV554.mp4" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+  </div>
 </body>
 </html>
+
