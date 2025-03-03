@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shree Dangigev Diamonds</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Full-screen minimalist layout */
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      height: 100%;
+      overflow: hidden;
+    }
+    .video-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    video {
+      max-width: 100%;
+      max-height: 100%;
+    }
+    /* Loading spinner */
+    .spinner {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255, 255, 255, 0.3);
+      border-top: 5px solid #fff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      z-index: 10;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    /* Custom controls styling */
+    .controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 10;
+    }
+    .controls button {
+      background: rgba(0, 0, 0, 0.5);
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .progress {
+      flex: 1;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #fff;
+      width: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="video-container">
+    <!-- Loading Spinner -->
+    <div class="spinner" id="spinner"></div>
+    <!-- Video Element (without default controls) -->
+    <video id="myVideo" autoplay muted playsinline loop>
+      <source src="assets/videos/POV554.mp4" type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
+    <!-- Custom Controls -->
+    <div class="controls" id="customControls">
+      <button id="playPause">Pause</button>
+      <div class="progress" id="progressContainer">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const video = document.getElementById('myVideo');
+    const spinner = document.getElementById('spinner');
+    const playPauseBtn = document.getElementById('playPause');
+    const progressBar = document.getElementById('progressBar');
+    const progressContainer = document.getElementById('progressContainer');
+
+    // Hide the spinner once the video is ready
+    video.addEventListener('loadeddata', () => {
+      spinner.style.display = 'none';
+    });
+
+    // Toggle play/pause state and update button text
+    playPauseBtn.addEventListener('click', () => {
+      if (video.paused) {
+        video.play();
+        playPauseBtn.textContent = 'Pause';
+      } else {
+        video.pause();
+        playPauseBtn.textContent = 'Play';
+      }
+    });
+
+    // Update the progress bar as the video plays
+    video.addEventListener('timeupdate', () => {
+      const percent = (video.currentTime / video.duration) * 100;
+      progressBar.style.width = percent + '%';
+    });
+
+    // Allow users to click on the progress bar to seek
+    progressContainer.addEventListener('click', (e) => {
+      const rect = progressContainer.getBoundingClientRect();
+      const pos = (e.clientX - rect.left) / rect.width;
+      video.currentTime = pos * video.duration;
+    });
+  </script>
+</body>
+</html>
