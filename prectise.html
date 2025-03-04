@@ -40,14 +40,15 @@
     let startX = 0;
     let videoDuration = 0;
     let lastDeltaX = 0;
-    let smoothFactor = 0.05;
+    let smoothFactor = 0.2; // Increased for better responsiveness
+    let sensitivity = 2.5; // Higher value makes it more responsive
     
     video.addEventListener("loadedmetadata", () => {
       videoDuration = video.duration;
     });
     
     function smoothSeek(deltaX) {
-      lastDeltaX += (-deltaX - lastDeltaX) * smoothFactor; // Inverted direction for parallel movement
+      lastDeltaX += (-deltaX * sensitivity - lastDeltaX) * smoothFactor;
       let seekTime = video.currentTime + (lastDeltaX / window.innerWidth) * videoDuration;
       if (seekTime < 0) {
         seekTime += videoDuration;
