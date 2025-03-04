@@ -40,22 +40,24 @@
     let startX = 0;
     let videoDuration = 0;
     let lastDeltaX = 0;
-    let smoothFactor = 0.2; // Increased for better responsiveness
-    let sensitivity = 2.5; // Higher value makes it more responsive
+    let smoothFactor = 0.15; // Adjusted for better mobile performance
+    let sensitivity = 2.5;
+    let animationFrame;
     
     video.addEventListener("loadedmetadata", () => {
       videoDuration = video.duration;
     });
     
-    function smoothSeek(deltaX) {
-      lastDeltaX += (-deltaX * sensitivity - lastDeltaX) * smoothFactor;
-      let seekTime = video.currentTime + (lastDeltaX / window.innerWidth) * videoDuration;
-      if (seekTime < 0) {
-        seekTime += videoDuration;
-      } else if (seekTime > videoDuration) {
-        seekTime -= videoDuration;
-      }
-      video.currentTime = seekTime;
+    function smoothSeek() {
+      if (!isDragging) return;
+      video.currentTime = (video.currentTime + (lastDeltaX / window.innerWidth) * videoDuration + videoDuration) % videoDuration;
+      lastDeltaX *= smoothFactor; // Gradual slowdown for smoother movement
+      animationFrame = requestAnimationFrame(smoothSeek);
+    }
+    
+    function startSeek() {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = requestAnimationFrame(smoothSeek);
     }
     
     document.addEventListener("mousedown", (e) => {
@@ -65,9 +67,9 @@
     
     document.addEventListener("mousemove", (e) => {
       if (isDragging) {
-        let deltaX = e.clientX - startX;
-        smoothSeek(deltaX);
+        lastDeltaX = (e.clientX - startX) * sensitivity;
         startX = e.clientX;
+        startSeek();
       }
     });
     
@@ -82,9 +84,9 @@
     
     document.addEventListener("touchmove", (e) => {
       if (isDragging) {
-        let deltaX = e.touches[0].clientX - startX;
-        smoothSeek(deltaX);
+        lastDeltaX = (e.touches[0].clientX - startX) * sensitivity;
         startX = e.touches[0].clientX;
+        startSeek();
       }
     });
     
