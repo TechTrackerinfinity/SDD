@@ -49,7 +49,12 @@
     function smoothSeek(deltaX) {
       lastDeltaX += (-deltaX - lastDeltaX) * smoothFactor; // Inverted direction for parallel movement
       let seekTime = video.currentTime + (lastDeltaX / window.innerWidth) * videoDuration;
-      video.currentTime = Math.max(0, Math.min(seekTime, videoDuration));
+      if (seekTime < 0) {
+        seekTime += videoDuration;
+      } else if (seekTime > videoDuration) {
+        seekTime -= videoDuration;
+      }
+      video.currentTime = seekTime;
     }
     
     document.addEventListener("mousedown", (e) => {
