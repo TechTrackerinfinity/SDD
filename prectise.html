@@ -1,98 +1,244 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>360° Video Control</title>
-  <link rel="stylesheet" href="style.css" />
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      background-color: #000;
-      height: 100%;
-      overflow: hidden;
-    }
-    .video-container {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    video {
-      max-width: 100%;
-      max-height: 100%;
-    }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Enhanced Smooth 360° Video Player</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            height: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        video {
+            max-width: 100%;
+            max-height: 100%;
+            cursor: grab;
+        }
+        video:active {
+            cursor: grabbing;
+        }
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        #rotationIndicator, #playbackSpeedIndicator {
+            color: white;
+            font-size: 14px;
+        }
+        .zoom-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .zoom-button {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
-  <div class="video-container" id="videoContainer">
-    <video id="myVideo" autoplay muted playsinline loop>
-      <source src="assets/videos/POV554.mp4" type="video/mp4" />
-      Your browser does not support the video tag.
-    </video>
-  </div>
-  <script>
-    const video = document.getElementById("myVideo");
-    let isDragging = false;
-    let startX = 0;
-    let videoDuration = 0;
-    let lastDeltaX = 0;
-    let smoothFactor = 0.15; // Adjusted for better mobile performance
-    let sensitivity = 2.5;
-    let animationFrame;
-    
-    video.addEventListener("loadedmetadata", () => {
-      videoDuration = video.duration;
-    });
-    
-    function smoothSeek() {
-      if (!isDragging) return;
-      video.currentTime = (video.currentTime + (lastDeltaX / window.innerWidth) * videoDuration + videoDuration) % videoDuration;
-      lastDeltaX *= smoothFactor; // Gradual slowdown for smoother movement
-      animationFrame = requestAnimationFrame(smoothSeek);
-    }
-    
-    function startSeek() {
-      cancelAnimationFrame(animationFrame);
-      animationFrame = requestAnimationFrame(smoothSeek);
-    }
-    
-    document.addEventListener("mousedown", (e) => {
-      isDragging = true;
-      startX = e.clientX;
-    });
-    
-    document.addEventListener("mousemove", (e) => {
-      if (isDragging) {
-        lastDeltaX = (e.clientX - startX) * sensitivity;
-        startX = e.clientX;
-        startSeek();
-      }
-    });
-    
-    document.addEventListener("mouseup", () => {
-      isDragging = false;
-    });
-    
-    document.addEventListener("touchstart", (e) => {
-      isDragging = true;
-      startX = e.touches[0].clientX;
-    });
-    
-    document.addEventListener("touchmove", (e) => {
-      if (isDragging) {
-        lastDeltaX = (e.touches[0].clientX - startX) * sensitivity;
-        startX = e.touches[0].clientX;
-        startSeek();
-      }
-    });
-    
-    document.addEventListener("touchend", () => {
-      isDragging = false;
-    });
-  </script>
+    <div class="video-container" id="videoContainer">
+        <video id="myVideo" autoplay muted playsinline loop>
+            <source src="assets/videos/POV554.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+        </video>
+    </div>
+    <div class="controls">
+        <div id="rotationIndicator">Rotation: 0°</div>
+        <div id="playbackSpeedIndicator">Speed: 1x</div>
+    </div>
+    <div class="zoom-controls">
+        <button class="zoom-button" id="zoomInBtn">Zoom In</button>
+        <button class="zoom-button" id="zoomOutBtn">Zoom Out</button>
+    </div>
+
+    <script>
+        class VideoRotationController {
+            constructor(videoElement) {
+                // Video and DOM elements
+                this.video = videoElement;
+                this.rotationIndicator = document.getElementById('rotationIndicator');
+                this.playbackSpeedIndicator = document.getElementById('playbackSpeedIndicator');
+                this.zoomInBtn = document.getElementById('zoomInBtn');
+                this.zoomOutBtn = document.getElementById('zoomOutBtn');
+
+                // Rotation and interaction states
+                this.isDragging = false;
+                this.startX = 0;
+                this.lastX = 0;
+                this.videoDuration = 0;
+                
+                // Enhanced performance parameters
+                this.sensitivity = 2.5; // Fine-tuned sensitivity
+                this.momentumFactor = 0.92; // Smoother deceleration
+                this.velocityThreshold = 0.05; // Lower threshold for smoother stops
+                
+                // Physics-based rotation
+                this.velocity = 0;
+                this.currentRotation = 0;
+
+                // Zoom management
+                this.zoomLevel = 1;
+                this.minZoom = 1;
+                this.maxZoom = 3;
+                this.zoomStep = 0.5;
+
+                // Advanced rotation tracking
+                this.rotationSmoothing = 0.2; // Smoother rotation interpolation
+                this.targetRotation = 0;
+
+                this.initializeEventListeners();
+                this.setupAnimationLoop();
+                this.setupZoomControls();
+            }
+
+            initializeEventListeners() {
+                this.video.addEventListener("loadedmetadata", () => {
+                    this.videoDuration = this.video.duration;
+                });
+
+                // Unified event listeners for mouse and touch
+                const eventMap = {
+                    start: ['mousedown', 'touchstart'],
+                    move: ['mousemove', 'touchmove'],
+                    end: ['mouseup', 'touchend', 'mouseleave']
+                };
+
+                eventMap.start.forEach(event => 
+                    document.addEventListener(event, this.startDrag.bind(this), { passive: false })
+                );
+                eventMap.move.forEach(event => 
+                    document.addEventListener(event, this.handleDrag.bind(this), { passive: false })
+                );
+                eventMap.end.forEach(event => 
+                    document.addEventListener(event, this.stopDrag.bind(this), { passive: false })
+                );
+            }
+
+            startDrag(e) {
+                e.preventDefault();
+                
+                const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                
+                if (clientX !== undefined) {
+                    this.isDragging = true;
+                    this.startX = clientX;
+                    this.lastX = clientX;
+                    this.velocity = 0;
+                }
+            }
+
+            handleDrag(e) {
+                if (!this.isDragging) return;
+
+                const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                
+                if (clientX !== undefined) {
+                    // Advanced rotation calculation
+                    const deltaX = clientX - this.lastX;
+                    const normalizedDelta = deltaX / window.innerWidth;
+                    
+                    // Precise video time and rotation update
+                    const timeShift = normalizedDelta * this.videoDuration * this.sensitivity;
+                    this.video.currentTime = (
+                        this.video.currentTime + timeShift + 
+                        this.videoDuration
+                    ) % this.videoDuration;
+
+                    // Smooth rotation tracking
+                    this.targetRotation = (this.targetRotation + deltaX) % 360;
+                    this.velocity = deltaX * this.sensitivity;
+
+                    // Update tracking
+                    this.lastX = clientX;
+                    
+                    // Update rotation indicator with smoothing
+                    const displayRotation = Math.abs(Math.round(this.targetRotation));
+                    this.rotationIndicator.textContent = `Rotation: ${displayRotation}°`;
+                }
+            }
+
+            stopDrag() {
+                this.isDragging = false;
+            }
+
+            setupZoomControls() {
+                this.zoomInBtn.addEventListener('click', () => this.adjustZoom(1));
+                this.zoomOutBtn.addEventListener('click', () => this.adjustZoom(-1));
+            }
+
+            adjustZoom(direction) {
+                const newZoom = this.zoomLevel + (direction * this.zoomStep);
+                
+                if (newZoom >= this.minZoom && newZoom <= this.maxZoom) {
+                    this.zoomLevel = newZoom;
+                    this.video.style.transform = `scale(${this.zoomLevel})`;
+                }
+            }
+
+            setupAnimationLoop() {
+                const animate = () => {
+                    // Momentum-based rotation
+                    if (!this.isDragging && Math.abs(this.velocity) > this.velocityThreshold) {
+                        // Smooth time and rotation update
+                        const normalizedVelocity = this.velocity / window.innerWidth;
+                        this.video.currentTime = (
+                            this.video.currentTime + 
+                            (normalizedVelocity * this.videoDuration * this.sensitivity) + 
+                            this.videoDuration
+                        ) % this.videoDuration;
+
+                        // Gradual velocity reduction
+                        this.velocity *= this.momentumFactor;
+
+                        // Update playback speed indicator
+                        const speed = Math.abs(this.velocity).toFixed(2);
+                        this.playbackSpeedIndicator.textContent = `Speed: ${speed}x`;
+                    } else if (!this.isDragging) {
+                        // Reset speed when no movement
+                        this.playbackSpeedIndicator.textContent = 'Speed: 1x';
+                    }
+
+                    requestAnimationFrame(animate);
+                };
+
+                animate();
+            }
+        }
+
+        // Initialize the rotation controller
+        const video = document.getElementById("myVideo");
+        new VideoRotationController(video);
+    </script>
 </body>
 </html>
