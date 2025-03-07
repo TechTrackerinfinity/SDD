@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sprite Sheet Playback & Scrubbing</title>
+  <title>Diamond-Themed Video Playback & Scrubbing</title>
   <style>
     html, body {
       margin: 0;
@@ -12,18 +12,58 @@
       overflow: hidden;
       height: 100%;
     }
-    /* The canvas fills the viewport */
+    /* Canvas fills the viewport */
     #displayCanvas {
       display: block;
       width: 100vw;
       height: 100vh;
       background: #000;
     }
+    /* Full-screen diamond-themed loading overlay */
+    #loadingOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 200;
+    }
+    /* Diamond element: a rotated square with gradient and spin animation */
+    #diamond {
+      width: 100px;
+      height: 100px;
+      background: linear-gradient(135deg, #0ff, #00f);
+      transform: rotate(45deg);
+      animation: spin 2s linear infinite;
+    }
+    /* Loading text styling */
+    #loadingText {
+      color: #fff;
+      font-size: 24px;
+      margin-top: 20px;
+      font-family: sans-serif;
+    }
+    @keyframes spin {
+      from { transform: rotate(45deg); }
+      to { transform: rotate(405deg); }
+    }
   </style>
 </head>
 <body>
-  <!-- Canvas for playback and scrubbing -->
+  <!-- Diamond-themed loading overlay -->
+  <div id="loadingOverlay">
+    <div id="diamond"></div>
+    <div id="loadingText">Loading...</div>
+  </div>
+  
+  <!-- Canvas for sprite sheet playback and scrubbing -->
   <canvas id="displayCanvas"></canvas>
+  
   <script>
     (function() {
       const canvas = document.getElementById('displayCanvas');
@@ -31,31 +71,36 @@
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       
-      // Sprite sheet configuration (original resolution sprite sheet)
-      const totalFrames = 256;  // 256 frames (16x16 grid)
-      const columns = 16;
-      const originalFrameWidth = 600;   // Original width per frame
-      const originalFrameHeight = 600;  // Original height per frame
+      // Sprite sheet configuration:
+      const totalFrames = 256;          // 256 frames in a 16x16 grid
+      const columns = 16;               // Frames per row
+      const originalFrameWidth = 600;   // Original frame width (from video)
+      const originalFrameHeight = 600;  // Original frame height
       
-      // Playback configuration
-      const frameRate = 20; // Playback frame rate (20 fps)
+      // Playback configuration:
+      const frameRate = 20;             // 20 frames per second
       const frameDuration = 1000 / frameRate;
-      
       let currentFrameIndex = 0;
       let lastUpdateTime = performance.now();
-      let playing = true;
+      let playing = true;               // Automatic playback state
       
-      // Scrubbing state
+      // Scrubbing state variables:
       let scrubbing = false;
       let startX = 0;
       let startFrameIndex = 0;
-      const sensitivity = 1; // 1 pixel movement = 1 frame
+      const sensitivity = 1;            // 1 pixel movement = 1 frame change
       
-      // Load the sprite sheet (using WebP for smaller file size)
+      // Load the high-quality sprite sheet (WebP or PNG)
       const spriteSheet = new Image();
-      spriteSheet.src = "assets/spritesheet.webp"; // Updated path
+      spriteSheet.src = "assets/spritesheet.webp"; // Ensure the path and format match your generated file
       
-      // Pointer events for scrubbing
+      // When the sprite sheet is loaded, hide the loading overlay and start drawing.
+      spriteSheet.onload = function() {
+        document.getElementById('loadingOverlay').style.display = 'none';
+        requestAnimationFrame(draw);
+      };
+      
+      // Pointer events for scrubbing:
       canvas.addEventListener('pointerdown', (e) => {
         scrubbing = true;
         playing = false;
@@ -86,7 +131,7 @@
       
       canvas.addEventListener('contextmenu', (e) => e.preventDefault());
       
-      // Main draw loop
+      // Main draw loop: update frame index and draw current frame from sprite sheet.
       function draw() {
         const now = performance.now();
         if (playing && !scrubbing) {
@@ -100,27 +145,24 @@
         
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Scale to fit the frame into the canvas while preserving aspect ratio.
+        // Calculate scaling to fit the frame within the canvas while preserving aspect ratio.
         const scale = Math.min(canvas.width / originalFrameWidth, canvas.height / originalFrameHeight);
         const drawWidth = originalFrameWidth * scale;
         const drawHeight = originalFrameHeight * scale;
         const dx = (canvas.width - drawWidth) / 2;
         const dy = (canvas.height - drawHeight) / 2;
         
+        // Compute the sprite sheet coordinates of the current frame.
         const col = currentFrameIndex % columns;
         const row = Math.floor(currentFrameIndex / columns);
         const sx = col * originalFrameWidth;
         const sy = row * originalFrameHeight;
         
         ctx.drawImage(spriteSheet, sx, sy, originalFrameWidth, originalFrameHeight, dx, dy, drawWidth, drawHeight);
-        
         requestAnimationFrame(draw);
       }
       
-      spriteSheet.onload = function() {
-        requestAnimationFrame(draw);
-      };
-      
+      // Adjust canvas size on window resize.
       window.addEventListener('resize', () => {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
