@@ -1,142 +1,72 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smooth Video Scrubbing Experience</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sprite Sheet Video Scrubbing</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
       background: #000;
-      overflow: hidden;
       height: 100%;
+      overflow: hidden;
     }
-    #scrubCanvas {
+    /* The container will display the correct frame from the sprite sheet */
+    #scrubContainer {
+      position: relative;
       width: 100vw;
       height: 100vh;
-      object-fit: contain;
-      display: block;
-      background: #000;
-    }
-    #loadingIndicator {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: #fff;
-      font-family: sans-serif;
-      font-size: 24px;
-      z-index: 10;
+      background: url('assets/spritesheet.jpg') no-repeat;
+      /* Adjust background-size to match your sprite sheet dimensions */
+      background-size: auto 100%;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <canvas id="scrubCanvas"></canvas>
-  <div id="loadingIndicator">Loading frames...</div>
-  <!-- Hidden video element used to extract frames -->
-  <video id="preloadVideo" src="assets/videos/HT25.mp4" style="display:none" muted playsinline></video>
+  <div id="scrubContainer"></div>
   <script>
     (function() {
-      const video = document.getElementById('preloadVideo');
-      const canvas = document.getElementById('scrubCanvas');
-      const loadingIndicator = document.getElementById('loadingIndicator');
-      const ctx = canvas.getContext('2d');
-
-      // Set canvas dimensions to match viewport.
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-
-      // Array to store preloaded frame images.
-      const frames = [];
-      const fps = 30;             // Assume video is 30fps.
-      const frameStep = 2;        // Only load every 2nd frame to reduce load time.
-      let originalTotalFrames = 0;
-      let totalFrames = 0;
-      let isPreloading = true;
-
-      // Once metadata is loaded, begin extracting frames.
-      video.addEventListener('loadedmetadata', async () => {
-        originalTotalFrames = Math.floor(video.duration * fps);
-        totalFrames = Math.floor(originalTotalFrames / frameStep);
-        console.log("Original total frames:", originalTotalFrames);
-        console.log("Preloading", totalFrames, "frames (every", frameStep, "frame)");
-
-        // Offscreen canvas for capturing video frames.
-        const offscreenCanvas = document.createElement('canvas');
-        const offscreenCtx = offscreenCanvas.getContext('2d');
-        offscreenCanvas.width = video.videoWidth;
-        offscreenCanvas.height = video.videoHeight;
-
-        // Preload frames by seeking the video.
-        for (let i = 0; i < originalTotalFrames; i += frameStep) {
-          let time = i / fps;
-          video.currentTime = time;
-          await new Promise(resolve => {
-            video.addEventListener('seeked', resolve, { once: true });
-          });
-          offscreenCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-          const img = new Image();
-          img.src = offscreenCanvas.toDataURL();
-          frames.push(img);
-          // Update the loading indicator.
-          loadingIndicator.textContent = `Loading frames... ${Math.floor((frames.length / totalFrames) * 100)}%`;
-        }
-        isPreloading = false;
-        loadingIndicator.style.display = 'none';
-        drawFrame(0);
-      });
-
-      // Draw a specific frame on the visible canvas while preserving aspect ratio.
-      function drawFrame(index) {
-        if (!frames[index]) return;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const img = frames[index];
-        const iw = video.videoWidth;
-        const ih = video.videoHeight;
-        const cw = canvas.width;
-        const ch = canvas.height;
-        const scale = Math.min(cw / iw, ch / ih);
-        const newWidth = iw * scale;
-        const newHeight = ih * scale;
-        const dx = (cw - newWidth) / 2;
-        const dy = (ch - newHeight) / 2;
-        ctx.drawImage(img, 0, 0, iw, ih, dx, dy, newWidth, newHeight);
-      }
-
-      // Scrubbing logic.
+      // Update these based on your sprite sheet configuration
+      const totalFrames = 180;   // Total number of frames in your sprite sheet
+      const frameWidth = 320;      // Width of each frame (in pixels)
+      
+      const container = document.getElementById('scrubContainer');
       let isScrubbing = false;
       let startX = 0;
       let startFrameIndex = 0;
       let currentFrameIndex = 0;
-
-      canvas.addEventListener('pointerdown', (e) => {
-        if (isPreloading) return;
+      
+      container.addEventListener('pointerdown', (e) => {
         isScrubbing = true;
         startX = e.clientX;
         startFrameIndex = currentFrameIndex;
       });
-
-      canvas.addEventListener('pointermove', (e) => {
+      
+      container.addEventListener('pointermove', (e) => {
         if (!isScrubbing) return;
         let diffX = e.clientX - startX;
-        // 1 pixel movement = 1 frame change.
+        // Adjust sensitivity: 1 pixel movement equals 1 frame change
         let newIndex = (startFrameIndex + diffX) % totalFrames;
         if (newIndex < 0) newIndex += totalFrames;
         newIndex = Math.floor(newIndex);
         if (newIndex !== currentFrameIndex) {
           currentFrameIndex = newIndex;
-          drawFrame(currentFrameIndex);
+          // Shift the background to show the current frame:
+          container.style.backgroundPosition = `-${currentFrameIndex * frameWidth}px 0`;
         }
       });
-
-      canvas.addEventListener('pointerup', () => {
+      
+      container.addEventListener('pointerup', () => {
         isScrubbing = false;
       });
-      canvas.addEventListener('pointercancel', () => {
+      
+      container.addEventListener('pointercancel', () => {
         isScrubbing = false;
       });
-      canvas.addEventListener('contextmenu', (e) => {
+      
+      container.addEventListener('contextmenu', (e) => {
         e.preventDefault();
       });
     })();
