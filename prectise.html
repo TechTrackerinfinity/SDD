@@ -1,111 +1,145 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>S</title>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow: hidden;
-            background: black;
-        }
-        #videoContainer {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        #myVideo {
-            max-width: 100%;
-            max-height: 100%;
-            cursor: grab;
-        }
-        #rotationInfo {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            background: rgba(0,0,0,0.5);
-            padding: 10px;
-            border-radius: 5px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smooth Video Scrubbing Experience</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      overflow: hidden;
+      height: 100%;
+    }
+    #scrubCanvas {
+      width: 100vw;
+      height: 100vh;
+      object-fit: contain;
+      display: block;
+      background: #000;
+    }
+    #loadingIndicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      font-family: sans-serif;
+      font-size: 24px;
+      z-index: 10;
+    }
+  </style>
 </head>
 <body>
-    <div id="videoContainer">
-        <video id="myVideo" autoplay muted loop playsinline>
-            <source src="assets/videos/HEART 24.mp4" type="video/mp4" />
-        </video>
-    </div>
-    <div id="rotationInfo">Rotation: 0°</div>
+  <canvas id="scrubCanvas"></canvas>
+  <div id="loadingIndicator">Loading frames...</div>
+  <!-- Hidden video element used to extract frames -->
+  <video id="preloadVideo" src="assets/videos/HT25.mp4" style="display:none" muted playsinline></video>
+  <script>
+    (function() {
+      const video = document.getElementById('preloadVideo');
+      const canvas = document.getElementById('scrubCanvas');
+      const loadingIndicator = document.getElementById('loadingIndicator');
+      const ctx = canvas.getContext('2d');
 
-    <script>
-    class VideoRotation {
-        constructor(video) {
-            this.video = video;
-            this.rotationInfo = document.getElementById('rotationInfo');
-            this.isDragging = false;
-            this.lastX = 0;
-            this.rotation = 0;
+      // Set canvas dimensions to match viewport.
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
 
-            this.setupListeners();
+      // Array to store preloaded frame images.
+      const frames = [];
+      const fps = 30;             // Assume video is 30fps.
+      const frameStep = 2;        // Only load every 2nd frame to reduce load time.
+      let originalTotalFrames = 0;
+      let totalFrames = 0;
+      let isPreloading = true;
+
+      // Once metadata is loaded, begin extracting frames.
+      video.addEventListener('loadedmetadata', async () => {
+        originalTotalFrames = Math.floor(video.duration * fps);
+        totalFrames = Math.floor(originalTotalFrames / frameStep);
+        console.log("Original total frames:", originalTotalFrames);
+        console.log("Preloading", totalFrames, "frames (every", frameStep, "frame)");
+
+        // Offscreen canvas for capturing video frames.
+        const offscreenCanvas = document.createElement('canvas');
+        const offscreenCtx = offscreenCanvas.getContext('2d');
+        offscreenCanvas.width = video.videoWidth;
+        offscreenCanvas.height = video.videoHeight;
+
+        // Preload frames by seeking the video.
+        for (let i = 0; i < originalTotalFrames; i += frameStep) {
+          let time = i / fps;
+          video.currentTime = time;
+          await new Promise(resolve => {
+            video.addEventListener('seeked', resolve, { once: true });
+          });
+          offscreenCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+          const img = new Image();
+          img.src = offscreenCanvas.toDataURL();
+          frames.push(img);
+          // Update the loading indicator.
+          loadingIndicator.textContent = `Loading frames... ${Math.floor((frames.length / totalFrames) * 100)}%`;
         }
+        isPreloading = false;
+        loadingIndicator.style.display = 'none';
+        drawFrame(0);
+      });
 
-        setupListeners() {
-            this.video.addEventListener('loadedmetadata', () => {
-                this.duration = this.video.duration;
-            });
+      // Draw a specific frame on the visible canvas while preserving aspect ratio.
+      function drawFrame(index) {
+        if (!frames[index]) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const img = frames[index];
+        const iw = video.videoWidth;
+        const ih = video.videoHeight;
+        const cw = canvas.width;
+        const ch = canvas.height;
+        const scale = Math.min(cw / iw, ch / ih);
+        const newWidth = iw * scale;
+        const newHeight = ih * scale;
+        const dx = (cw - newWidth) / 2;
+        const dy = (ch - newHeight) / 2;
+        ctx.drawImage(img, 0, 0, iw, ih, dx, dy, newWidth, newHeight);
+      }
 
-            // Use single passive event listeners
-            this.video.addEventListener('mousedown', this.startDrag.bind(this), { passive: false });
-            document.addEventListener('mousemove', this.drag.bind(this), { passive: false });
-            document.addEventListener('mouseup', this.stopDrag.bind(this), { passive: true });
+      // Scrubbing logic.
+      let isScrubbing = false;
+      let startX = 0;
+      let startFrameIndex = 0;
+      let currentFrameIndex = 0;
 
-            // Touch support
-            this.video.addEventListener('touchstart', this.startDrag.bind(this), { passive: false });
-            document.addEventListener('touchmove', this.drag.bind(this), { passive: false });
-            document.addEventListener('touchend', this.stopDrag.bind(this), { passive: true });
+      canvas.addEventListener('pointerdown', (e) => {
+        if (isPreloading) return;
+        isScrubbing = true;
+        startX = e.clientX;
+        startFrameIndex = currentFrameIndex;
+      });
+
+      canvas.addEventListener('pointermove', (e) => {
+        if (!isScrubbing) return;
+        let diffX = e.clientX - startX;
+        // 1 pixel movement = 1 frame change.
+        let newIndex = (startFrameIndex + diffX) % totalFrames;
+        if (newIndex < 0) newIndex += totalFrames;
+        newIndex = Math.floor(newIndex);
+        if (newIndex !== currentFrameIndex) {
+          currentFrameIndex = newIndex;
+          drawFrame(currentFrameIndex);
         }
+      });
 
-        startDrag(e) {
-            e.preventDefault();
-            this.isDragging = true;
-            this.lastX = e.clientX || (e.touches && e.touches[0].clientX);
-        }
-
-        drag(e) {
-            if (!this.isDragging) return;
-            e.preventDefault();
-
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const deltaX = clientX - this.lastX;
-
-            // Calculate time shift based on drag
-            const timeShift = (deltaX / window.innerWidth) * this.duration;
-            this.video.currentTime = (this.video.currentTime + timeShift + this.duration) % this.duration;
-
-            // Update rotation display
-            this.rotation = (this.rotation + deltaX) % 360;
-            this.rotationInfo.textContent = `Rotation: ${Math.abs(Math.round(this.rotation))}°`;
-
-            this.lastX = clientX;
-        }
-
-        stopDrag() {
-            this.isDragging = false;
-        }
-    }
-
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', () => {
-        const video = document.getElementById('myVideo');
-        new VideoRotation(video);
-    });
-    </script>
+      canvas.addEventListener('pointerup', () => {
+        isScrubbing = false;
+      });
+      canvas.addEventListener('pointercancel', () => {
+        isScrubbing = false;
+      });
+      canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+      });
+    })();
+  </script>
 </body>
 </html>
