@@ -3,71 +3,134 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sprite Sheet Video Scrubbing</title>
+  <title>Sprite Sheet Playback & Scrubbing</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
       background: #000;
-      height: 100%;
       overflow: hidden;
+      height: 100%;
     }
-    /* The container will display the correct frame from the sprite sheet */
-    #scrubContainer {
-      position: relative;
+    /* The canvas fills the viewport */
+    #displayCanvas {
+      display: block;
       width: 100vw;
       height: 100vh;
-      background: url('assets/spritesheet.jpg') no-repeat;
-      /* Adjust background-size to match your sprite sheet dimensions */
-      background-size: auto 100%;
-      cursor: pointer;
+      background: #000;
     }
   </style>
 </head>
 <body>
-  <div id="scrubContainer"></div>
+  <!-- Canvas for playback and scrubbing -->
+  <canvas id="displayCanvas"></canvas>
   <script>
     (function() {
-      // Update these based on your sprite sheet configuration
-      const totalFrames = 180;   // Total number of frames in your sprite sheet
-      const frameWidth = 320;      // Width of each frame (in pixels)
+      const canvas = document.getElementById('displayCanvas');
+      const ctx = canvas.getContext('2d');
       
-      const container = document.getElementById('scrubContainer');
-      let isScrubbing = false;
+      // Set canvas size to fill the window
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      
+      // Sprite sheet configuration:
+      const totalFrames = 256;      // 256 frames (16x16 grid)
+      const columns = 16;           // Number of frames per row
+      const originalFrameWidth = 600;   // Original frame width (from video)
+      const originalFrameHeight = 600;  // Original frame height (from video)
+      
+      // Playback configuration:
+      const frameRate = 20;                      // 20 frames per second
+      const frameDuration = 1000 / frameRate;      // Duration per frame in ms
+      
+      let currentFrameIndex = 0;
+      let lastUpdateTime = performance.now();
+      let playing = true;   // Playback mode
+      
+      // Scrubbing state
+      let scrubbing = false;
       let startX = 0;
       let startFrameIndex = 0;
-      let currentFrameIndex = 0;
+      const sensitivity = 1;  // 1 pixel movement = 1 frame change
       
-      container.addEventListener('pointerdown', (e) => {
-        isScrubbing = true;
+      // Load the high-quality sprite sheet PNG
+      const spriteSheet = new Image();
+      spriteSheet.src = "assets/spritesheet.png"; // Ensure this matches your output file
+      
+      // Pointer events for scrubbing:
+      canvas.addEventListener('pointerdown', (e) => {
+        scrubbing = true;
+        playing = false; // Pause automatic playback
         startX = e.clientX;
         startFrameIndex = currentFrameIndex;
       });
       
-      container.addEventListener('pointermove', (e) => {
-        if (!isScrubbing) return;
-        let diffX = e.clientX - startX;
-        // Adjust sensitivity: 1 pixel movement equals 1 frame change
-        let newIndex = (startFrameIndex + diffX) % totalFrames;
-        if (newIndex < 0) newIndex += totalFrames;
-        newIndex = Math.floor(newIndex);
-        if (newIndex !== currentFrameIndex) {
-          currentFrameIndex = newIndex;
-          // Shift the background to show the current frame:
-          container.style.backgroundPosition = `-${currentFrameIndex * frameWidth}px 0`;
+      canvas.addEventListener('pointermove', (e) => {
+        if (!scrubbing) return;
+        const diffX = e.clientX - startX;
+        let newIndex = startFrameIndex + diffX * sensitivity;
+        // Wrap the index if necessary
+        newIndex = ((newIndex % totalFrames) + totalFrames) % totalFrames;
+        currentFrameIndex = Math.floor(newIndex);
+      });
+      
+      canvas.addEventListener('pointerup', () => {
+        if (!scrubbing) return;
+        scrubbing = false;
+        playing = true;
+        lastUpdateTime = performance.now(); // reset the timer for smooth playback
+      });
+      
+      canvas.addEventListener('pointercancel', () => {
+        scrubbing = false;
+        playing = true;
+        lastUpdateTime = performance.now();
+      });
+      
+      canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+      
+      // Main draw loop: either auto-advance or show scrubbing frame
+      function draw() {
+        const now = performance.now();
+        if (playing && !scrubbing) {
+          const delta = now - lastUpdateTime;
+          if (delta >= frameDuration) {
+            const framesToAdvance = Math.floor(delta / frameDuration);
+            currentFrameIndex = (currentFrameIndex + framesToAdvance) % totalFrames;
+            lastUpdateTime = now;
+          }
         }
-      });
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Calculate scaling to fit the frame to the canvas while preserving aspect ratio.
+        const scale = Math.min(canvas.width / originalFrameWidth, canvas.height / originalFrameHeight);
+        const drawWidth = originalFrameWidth * scale;
+        const drawHeight = originalFrameHeight * scale;
+        const dx = (canvas.width - drawWidth) / 2;
+        const dy = (canvas.height - drawHeight) / 2;
+        
+        // Compute the position of the current frame within the sprite sheet.
+        const col = currentFrameIndex % columns;
+        const row = Math.floor(currentFrameIndex / columns);
+        const sx = col * originalFrameWidth;
+        const sy = row * originalFrameHeight;
+        
+        // Draw the current frame onto the canvas.
+        ctx.drawImage(spriteSheet, sx, sy, originalFrameWidth, originalFrameHeight, dx, dy, drawWidth, drawHeight);
+        
+        requestAnimationFrame(draw);
+      }
       
-      container.addEventListener('pointerup', () => {
-        isScrubbing = false;
-      });
+      // Start drawing when the sprite sheet is loaded.
+      spriteSheet.onload = function() {
+        requestAnimationFrame(draw);
+      };
       
-      container.addEventListener('pointercancel', () => {
-        isScrubbing = false;
-      });
-      
-      container.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
+      // Adjust canvas size on window resize.
+      window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
       });
     })();
   </script>
