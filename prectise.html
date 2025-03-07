@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Diamond-Themed Video Playback & Scrubbing</title>
+  <title>Sprite Sheet Playback & Scrubbing (Mobile Optimized)</title>
   <style>
     html, body {
       margin: 0;
@@ -12,58 +12,24 @@
       overflow: hidden;
       height: 100%;
     }
-    /* Canvas fills the viewport */
+    /* The canvas fills the viewport */
     #displayCanvas {
       display: block;
       width: 100vw;
       height: 100vh;
       background: #000;
+      /* Force hardware acceleration */
+      transform: translate3d(0,0,0);
     }
-    /* Full-screen diamond-themed loading overlay */
-    #loadingOverlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      z-index: 200;
-    }
-    /* Diamond element: a rotated square with gradient and spin animation */
-    #diamond {
-      width: 100px;
-      height: 100px;
-      background: linear-gradient(135deg, #0ff, #00f);
-      transform: rotate(45deg);
-      animation: spin 2s linear infinite;
-    }
-    /* Loading text styling */
-    #loadingText {
-      color: #fff;
-      font-size: 24px;
-      margin-top: 20px;
-      font-family: sans-serif;
-    }
-    @keyframes spin {
-      from { transform: rotate(45deg); }
-      to { transform: rotate(405deg); }
+    /* Optional: improve touch responsiveness */
+    * {
+      touch-action: none;
     }
   </style>
 </head>
 <body>
-  <!-- Diamond-themed loading overlay -->
-  <div id="loadingOverlay">
-    <div id="diamond"></div>
-    <div id="loadingText">Loading...</div>
-  </div>
-  
   <!-- Canvas for sprite sheet playback and scrubbing -->
   <canvas id="displayCanvas"></canvas>
-  
   <script>
     (function() {
       const canvas = document.getElementById('displayCanvas');
@@ -72,38 +38,41 @@
       canvas.height = window.innerHeight;
       
       // Sprite sheet configuration:
-      const totalFrames = 256;          // 256 frames in a 16x16 grid
-      const columns = 16;               // Frames per row
-      const originalFrameWidth = 600;   // Original frame width (from video)
-      const originalFrameHeight = 600;  // Original frame height
+      const totalFrames = 256;           // 256 frames in a 16x16 grid
+      const columns = 16;                // 16 frames per row
+      const originalFrameWidth = 600;    // Original frame width (from video)
+      const originalFrameHeight = 600;   // Original frame height
       
       // Playback configuration:
-      const frameRate = 20;             // 20 frames per second
+      const frameRate = 20;              // 20 frames per second
       const frameDuration = 1000 / frameRate;
       let currentFrameIndex = 0;
       let lastUpdateTime = performance.now();
-      let playing = true;               // Automatic playback state
+      let playing = true;
       
-      // Scrubbing state variables:
+      // Detect if device is mobile
+      const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+      // Adjust sensitivity: on mobile, increase sensitivity so that a small finger movement changes more frames
+      const sensitivity = isMobile ? 2 : 1;
+      
+      // Scrubbing state
       let scrubbing = false;
       let startX = 0;
       let startFrameIndex = 0;
-      const sensitivity = 1;            // 1 pixel movement = 1 frame change
       
-      // Load the high-quality sprite sheet (WebP or PNG)
+      // Load the sprite sheet (using WebP or PNG for high quality)
       const spriteSheet = new Image();
-      spriteSheet.src = "assets/spritesheet.webp"; // Ensure the path and format match your generated file
+      spriteSheet.src = "assets/spritesheet.webp"; // Ensure this path matches your file
       
-      // When the sprite sheet is loaded, hide the loading overlay and start drawing.
+      // When sprite sheet is loaded, start drawing
       spriteSheet.onload = function() {
-        document.getElementById('loadingOverlay').style.display = 'none';
         requestAnimationFrame(draw);
       };
       
-      // Pointer events for scrubbing:
+      // Pointer events for scrubbing
       canvas.addEventListener('pointerdown', (e) => {
         scrubbing = true;
-        playing = false;
+        playing = false; // Pause auto playback when scrubbing
         startX = e.clientX;
         startFrameIndex = currentFrameIndex;
       });
@@ -111,6 +80,7 @@
       canvas.addEventListener('pointermove', (e) => {
         if (!scrubbing) return;
         const diffX = e.clientX - startX;
+        // Multiply diffX by sensitivity so mobile swipes jump more frames
         let newIndex = startFrameIndex + diffX * sensitivity;
         newIndex = ((newIndex % totalFrames) + totalFrames) % totalFrames;
         currentFrameIndex = Math.floor(newIndex);
@@ -131,7 +101,7 @@
       
       canvas.addEventListener('contextmenu', (e) => e.preventDefault());
       
-      // Main draw loop: update frame index and draw current frame from sprite sheet.
+      // Main drawing loop: display sprite sheet frame scaled to fit canvas
       function draw() {
         const now = performance.now();
         if (playing && !scrubbing) {
@@ -145,14 +115,14 @@
         
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Calculate scaling to fit the frame within the canvas while preserving aspect ratio.
+        // Calculate scaling to preserve aspect ratio
         const scale = Math.min(canvas.width / originalFrameWidth, canvas.height / originalFrameHeight);
         const drawWidth = originalFrameWidth * scale;
         const drawHeight = originalFrameHeight * scale;
         const dx = (canvas.width - drawWidth) / 2;
         const dy = (canvas.height - drawHeight) / 2;
         
-        // Compute the sprite sheet coordinates of the current frame.
+        // Calculate current frame's position in the sprite sheet
         const col = currentFrameIndex % columns;
         const row = Math.floor(currentFrameIndex / columns);
         const sx = col * originalFrameWidth;
@@ -162,12 +132,10 @@
         requestAnimationFrame(draw);
       }
       
-      // Adjust canvas size on window resize.
       window.addEventListener('resize', () => {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
       });
-      
     })();
   </script>
 </body>
